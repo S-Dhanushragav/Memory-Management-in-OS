@@ -1,0 +1,176 @@
+***CODE***
+
+
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+// Memory block structure
+struct MemoryBlock {
+    int startAddress;
+    int size;
+    int allocated;
+    int processID;
+    struct MemoryBlock* next;
+};
+
+// Process structure
+struct Process {
+    int processID;
+    int size;
+};
+
+// Function to allocate memory to a process using First-Fit algorithm
+struct MemoryBlock* allocateMemory(struct MemoryBlock* memory, struct Process process) {
+    struct MemoryBlock* current = memory;
+    while (current != NULL) {
+        if (current->allocated == 0 && current->size >= process.size) {
+            current->allocated = 1;
+            current->processID = process.processID;
+            if (current->size > process.size) {
+                struct MemoryBlock* newBlock = (struct MemoryBlock*)malloc(sizeof(struct MemoryBlock));
+                newBlock->startAddress = current->startAddress + process.size;
+                newBlock->size = current->size - process.size;
+                newBlock->allocated = 0;
+                newBlock->processID = -1;
+                newBlock->next = current->next;
+                current->next = newBlock;
+                current->size = process.size;
+            }
+            return memory;
+        }
+        current = current->next;
+    }
+    printf("Error: Not enough free memory to allocate the process.\n");
+    return memory;
+}
+
+// Function to print memory blocks in a box-like format
+void printMemory(struct MemoryBlock* memory) {
+    printf("+-------------------------------------------------------------+\n");
+    printf("| %-15s | %-10s | %-12s | %-13s |\n", "Start Address", "Size", "Allocated", "Process ID");
+    printf("+-------------------------------------------------------------+\n");
+
+    struct MemoryBlock* current = memory;
+    while (current != NULL) {
+        printf("| %-15d | %-10d | %-12s | %-13d |\n",
+               current->startAddress, current->size,
+               current->allocated ? "Yes" : "No", current->processID);
+        current = current->next;
+    }
+
+    printf("+-------------------------------------------------------------+\n");
+}
+
+// Function to calculate fragmentation (unused memory)
+int calculateFragmentation(struct MemoryBlock* memory) {
+    int fragmentation = 0;
+    struct MemoryBlock* current = memory;
+    while (current != NULL) {
+        if (current->allocated == 0) {
+            fragmentation += current->size;
+        }
+        current = current->next;
+    }
+    return fragmentation;
+}
+
+// Function to calculate wasted memory (unused blocks)
+int calculateWastedMemory(struct MemoryBlock* memory) {
+    int wastedBlocks = 0;
+    struct MemoryBlock* current = memory;
+    while (current != NULL) {
+        if (current->allocated == 0) {
+            wastedBlocks++;
+        }
+        current = current->next;
+    }
+    return wastedBlocks;
+}
+
+// Function to deallocate memory used by a process
+struct MemoryBlock* deallocateMemory(struct MemoryBlock* memory, int processID) {
+    struct MemoryBlock* current = memory;
+    while (current != NULL) {
+        if (current->allocated && current->processID == processID) {
+            current->allocated = 0;
+            current->processID = -1;
+            // Merge adjacent free blocks if present
+            struct MemoryBlock* nextBlock = current->next;
+            while (nextBlock != NULL && nextBlock->allocated == 0) {
+                current->size += nextBlock->size;
+                current->next = nextBlock->next;
+                free(nextBlock);
+                nextBlock = current->next;
+            }
+            return memory;
+        }
+        current = current->next;
+    }
+    printf("Error: Process with ID %d not found.\n", processID);
+    return memory;
+}
+
+
+int main() {
+    int totalMemorySize;
+    printf("Enter total memory size: ");
+    scanf("%d", &totalMemorySize);
+
+    // Initialize memory with the given total size
+    struct MemoryBlock* memory = (struct MemoryBlock*)malloc(sizeof(struct MemoryBlock));
+    memory->startAddress = 0;
+    memory->size = totalMemorySize;
+    memory->allocated = 0;
+    memory->processID = -1;
+    memory->next = NULL;
+
+    int numberOfProcesses;
+    printf("Enter the number of processes: ");
+    scanf("%d", &numberOfProcesses);
+
+    // Get processes as input from the user
+    struct Process processes[numberOfProcesses];
+    for (int i = 0; i < numberOfProcesses; ++i) {
+        printf("Enter size of Process %d: ", i + 1);
+        scanf("%d", &processes[i].size);
+        processes[i].processID = i + 1;
+    }
+
+    // Print initial memory status (before allocation)
+    printf("\nMemory Status (Before Allocation):\n");
+    printMemory(memory);
+    int initialFragmentation = calculateFragmentation(memory);
+    int initialWastedMemory = calculateWastedMemory(memory);
+    printf("Initial Fragmentation: %d\n", initialFragmentation);
+    printf("Initial Wasted Memory Blocks: %d\n", initialWastedMemory);
+    // Allocate processes
+    for (int i = 0; i < numberOfProcesses; ++i) {
+        memory = allocateMemory(memory, processes[i]);
+        printf("\nMemory Status (After Allocating Process %d):\n", processes[i].processID);
+        printMemory(memory);
+    }
+
+    // Print memory status and calculate fragmentation and wasted memory after deallocation
+    int processIDToDeallocate = 2; // Example: Deallocate process with ID 2
+    memory = deallocateMemory(memory, processIDToDeallocate);
+    printf("\nMemory Status (After Deallocating Process %d):\n", processIDToDeallocate);
+    printMemory(memory);
+
+    int finalFragmentation = calculateFragmentation(memory);
+    int finalWastedMemory = calculateWastedMemory(memory);
+    printf("Final Fragmentation: %d\n", finalFragmentation);
+    printf("Final Wasted Memory Blocks: %d\n", finalWastedMemory);
+    // Free allocated memory blocks
+    struct MemoryBlock* current = memory;
+    while (current != NULL) {
+        struct MemoryBlock* nextBlock = current->next;
+        free(current);
+        current = nextBlock;
+    }
+    return 0;
+}
+
+
